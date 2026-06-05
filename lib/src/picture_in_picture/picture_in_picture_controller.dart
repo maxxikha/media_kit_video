@@ -4,8 +4,8 @@
 /// All rights reserved.
 /// Use of this source code is governed by MIT license that can be found in the LICENSE file.
 import 'dart:async';
-import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import 'package:media_kit_video/src/picture_in_picture/pip_event.dart';
@@ -26,8 +26,15 @@ abstract class PictureInPictureController {
   /// On unsupported platforms / OS versions this returns a no-op
   /// implementation whose [isSupported] resolves to `false`.
   factory PictureInPictureController.platform() {
-    if (Platform.isIOS) return PictureInPictureIOS();
-    if (Platform.isAndroid) return PictureInPictureAndroid();
+    // Web-safe : pas de dart:io. On utilise defaultTargetPlatform + kIsWeb
+    // (sinon l'import dart:io ferait planter la compilation web).
+    if (kIsWeb) return const PictureInPictureNoop();
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      return PictureInPictureIOS();
+    }
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return PictureInPictureAndroid();
+    }
     return const PictureInPictureNoop();
   }
 

@@ -343,10 +343,29 @@
       eventCallback(["event": "setPlaying", "playing": playing])
     }
 
+    // Le handle mpv reel est deja disponible ici (meme Int64 que celui
+    // stocke par VideoOutput, caste de facon identique). Sans duree
+    // connue (direct, ou handle/lecture indisponible pour n'importe
+    // quelle raison), on CONSERVE EXACTEMENT le comportement d'origine -
+    // le direct n'est JAMAIS affecte par ce changement.
     func pictureInPictureControllerTimeRangeForPlayback(
       _ pipController: AVPictureInPictureController
     ) -> CMTimeRange {
-      return CMTimeRange(start: .negativeInfinity, duration: .positiveInfinity)
+      guard
+        let handle = self.handle,
+        let mpvHandle = OpaquePointer(bitPattern: Int(handle))
+      else {
+        return CMTimeRange(start: .negativeInfinity, duration: .positiveInfinity)
+      }
+      let duration = MPVHelpers.getDuration(mpvHandle)
+      guard duration > 0 else {
+        // live/duree inconnue - comportement direct preserve
+        return CMTimeRange(start: .negativeInfinity, duration: .positiveInfinity)
+      }
+      return CMTimeRange(
+        start: .zero,
+        duration: CMTime(seconds: duration, preferredTimescale: 600)
+      )
     }
 
     func pictureInPictureControllerIsPlaybackPaused(
@@ -361,11 +380,22 @@
     ) {
     }
 
+    // Seek reel via le meme handle mpv que ci-dessus. completionHandler()
+    // toujours appele en dernier, comme avant (contrat AVKit respecte a
+    // l'identique).
     func pictureInPictureController(
       _ pipController: AVPictureInPictureController,
       skipByInterval skipInterval: CMTime,
       completion completionHandler: @escaping () -> Void
     ) {
+      if let handle = self.handle,
+        let mpvHandle = OpaquePointer(bitPattern: Int(handle))
+      {
+        let seconds = CMTimeGetSeconds(skipInterval)
+        if seconds.isFinite {
+          MPVHelpers.seekRelative(mpvHandle, seconds: seconds)
+        }
+      }
       completionHandler()
     }
   }

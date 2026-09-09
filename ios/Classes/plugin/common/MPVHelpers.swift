@@ -57,11 +57,19 @@ public enum MPVHelpers {
     _ handle: OpaquePointer,
     seconds: Double
   ) {
+    // ⭐ 9 sept. 2026 — corrigé après échec de compilation réel (build
+    // ios-testflight, erreur Swift à cette ligne) : mpv_command attend
+    // UnsafePointer<CChar>?, pas UnsafeMutablePointer<CChar>? (le type que
+    // strdup() renvoie nativement). On garde le pointeur MUTABLE à part
+    // (pour le libérer) et on ne convertit qu'à l'insertion dans le tableau
+    // passé à mpv_command.
     let args: [String] = ["seek", String(seconds), "relative"]
-    var cArgs: [UnsafeMutablePointer<CChar>?] = args.map { strdup($0) }
+    let mutablePtrs: [UnsafeMutablePointer<CChar>?] = args.map { strdup($0) }
+    var cArgs: [UnsafePointer<CChar>?] =
+        mutablePtrs.map { $0.map { UnsafePointer($0) } }
     cArgs.append(nil)
     defer {
-      cArgs.forEach { if let p = $0 { free(p) } }
+      mutablePtrs.forEach { if let p = $0 { free(p) } }
     }
     mpv_command(handle, &cArgs)
   }
